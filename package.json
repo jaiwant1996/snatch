@@ -1,0 +1,30 @@
+{
+  "name": "snatch",
+  "version": "1.0.0",
+  "description": "SNATCH! — real-time 1v1 browser arcade duel (peer-to-peer, static hosting)",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "build:e2e": "vite build --mode e2e --outDir dist-e2e",
+    "test:e2e": "node tests/e2e/run-e2e.mjs"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "phaser": "^3.90.0",
+    "trystero": "^0.26.0"
+  },
+  "devDependencies": {
+    "@trystero-p2p/ws-relay": "^0.26.0",
+    "typescript": "^5.9.3",
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
+  },
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  }
+}

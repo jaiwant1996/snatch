@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#121418" />
+    <meta name="description" content="SNATCH! — a real-time 1v1 browser duel. Grab the token, run it home, don't get robbed." />
+    <title>SNATCH! — 1v1 Arcade Duel</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23121418'/%3E%3Ccircle cx='22' cy='32' r='10' fill='none' stroke='%232ee6f0' stroke-width='5'/%3E%3Crect x='35' y='22' width='19' height='19' rx='4' transform='rotate(45 44.5 31.5)' fill='none' stroke='%23ff8a2a' stroke-width='5'/%3E%3Ccircle cx='32' cy='32' r='5' fill='%23fff3a0'/%3E%3C/svg%3E" />
+  </head>
+  <body data-screen="menu">
+    <div id="app">
+      <!-- ============================== MENU ============================== -->
+      <section id="screen-menu" class="screen" aria-labelledby="logo">
+        <div class="menu-wrap">
+          <div class="card menu-card">
+            <h1 id="logo" class="logo" aria-label="SNATCH!">
+              <span class="logo-s">SNATCH</span><span class="logo-bang">!</span>
+            </h1>
+            <p class="tagline">Grab it. Run. Don't get robbed.</p>
+
+            <label class="field">
+              <span class="field-label">Your nickname</span>
+              <input id="nickname" type="text" maxlength="16" autocomplete="nickname" spellcheck="false" placeholder="e.g. Rocket" />
+            </label>
+
+            <button id="btn-create" class="btn btn-primary btn-big" type="button">Create Room</button>
+
+            <div class="divider"><span>or join a friend</span></div>
+
+            <form id="join-form" class="join-row" novalidate>
+              <input id="join-code" class="code-input" type="text" inputmode="text" maxlength="9" autocomplete="off"
+                autocapitalize="characters" spellcheck="false" placeholder="ROOM CODE" aria-label="Room code" />
+              <button id="btn-join" class="btn btn-secondary" type="submit">Join Room</button>
+            </form>
+            <p id="join-error" class="form-error" role="alert"></p>
+
+            <p class="explainer">
+              A private <strong>1v1 duel</strong>. Create a room, send the code to one friend, and play directly
+              browser-to-browser — no accounts, no installs.
+            </p>
+          </div>
+
+          <div class="card howto-card">
+            <h2>How to play</h2>
+            <ol class="howto">
+              <li><span class="chip chip-token"></span><span>Grab the token in the middle.</span></li>
+              <li><span class="chip chip-home"></span><span>Carry it into <em>your own</em> home gate to score.</span></li>
+              <li><span class="chip chip-dash"></span><span><strong>Dash</strong> into the carrier to knock it loose.</span></li>
+              <li><span class="chip chip-win"></span><span>First to 3 — or lead when the 90 seconds run out.</span></li>
+            </ol>
+            <div class="keys">
+              <span><kbd>WASD</kbd>/<kbd>↑↓←→</kbd> move</span>
+              <span><kbd>Space</kbd>/<kbd>Shift</kbd> dash</span>
+              <span><kbd>Esc</kbd> menu</span>
+            </div>
+            <p id="local-stats" class="local-stats"></p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============================ CONNECTING ============================ -->
+      <section id="screen-connecting" class="screen">
+        <div class="card status-card">
+          <div class="spinner" aria-hidden="true"></div>
+          <h2 id="connecting-title">Connecting…</h2>
+          <p id="connecting-detail" class="muted"></p>
+          <div class="progress"><div id="connecting-bar" class="progress-bar"></div></div>
+          <button id="btn-cancel-join" class="btn btn-ghost" type="button">Cancel</button>
+        </div>
+      </section>
+
+      <!-- =============================== LOBBY =============================== -->
+      <section id="screen-lobby" class="screen">
+        <div class="card lobby-card">
+          <div class="lobby-head">
+            <div>
+              <div class="eyebrow">Room code</div>
+              <div id="lobby-code" class="room-code" aria-live="polite">------</div>
+            </div>
+            <div class="lobby-share">
+              <button id="btn-copy-code" class="btn btn-secondary btn-sm" type="button">Copy Code</button>
+              <button id="btn-share" class="btn btn-secondary btn-sm" type="button">Share Invite Link</button>
+            </div>
+          </div>
+
+          <div id="lobby-status" class="lobby-status" role="status" aria-live="polite">
+            <span class="dot"></span><span class="text">Waiting for opponent</span>
+          </div>
+
+          <div class="slots">
+            <div class="slot slot-cyan" id="slot-0">
+              <div class="slot-badge"><span class="shape shape-circle"></span></div>
+              <div class="slot-body">
+                <div class="slot-name">—</div>
+                <div class="slot-meta"><span class="conn"></span><span class="role">Host · Cyan</span></div>
+              </div>
+              <div class="slot-ready">Not ready</div>
+            </div>
+            <div class="vs">VS</div>
+            <div class="slot slot-orange" id="slot-1">
+              <div class="slot-badge"><span class="shape shape-diamond"></span></div>
+              <div class="slot-body">
+                <div class="slot-name">Waiting…</div>
+                <div class="slot-meta"><span class="conn"></span><span class="role">Guest · Orange</span></div>
+              </div>
+              <div class="slot-ready">—</div>
+            </div>
+          </div>
+
+          <label class="toggle" id="events-toggle-wrap">
+            <input type="checkbox" id="events-toggle" />
+            <span class="toggle-ui"></span>
+            <span><strong>Arena events</strong> — boost pads &amp; overdrive mid-match</span>
+          </label>
+
+          <div class="lobby-actions">
+            <button id="btn-ready" class="btn btn-primary" type="button">Ready</button>
+            <button id="btn-start" class="btn btn-go" type="button" disabled>Start Match</button>
+          </div>
+          <p id="lobby-hint" class="muted center small"></p>
+          <button id="btn-leave-lobby" class="btn btn-ghost btn-sm" type="button">Leave Room</button>
+        </div>
+      </section>
+
+      <!-- =============================== GAME =============================== -->
+      <section id="screen-game" class="screen">
+        <div id="hud" class="hud">
+          <div class="hud-side hud-left">
+            <span class="shape shape-circle"></span>
+            <span id="hud-name-0" class="hud-name">Cyan</span>
+            <span id="hud-score-0" class="hud-score">0</span>
+          </div>
+          <div class="hud-center">
+            <div id="hud-timer" class="hud-timer">1:30</div>
+            <div id="hud-event" class="hud-event"></div>
+          </div>
+          <div class="hud-side hud-right">
+            <span id="hud-score-1" class="hud-score">0</span>
+            <span id="hud-name-1" class="hud-name">Orange</span>
+            <span class="shape shape-diamond"></span>
+          </div>
+        </div>
+        <div id="game-stage">
+          <div id="game-root"></div>
+          <div id="center-banner" class="center-banner" aria-live="assertive"></div>
+          <div id="net-pill" class="net-pill"></div>
+        </div>
+        <div id="touch-controls" class="touch-controls" aria-hidden="true">
+          <div class="joystick"><div class="joy-ring"></div><div class="joy-knob"></div></div>
+          <div class="dash-btn"><span>DASH</span></div>
+        </div>
+        <button id="btn-pause" class="icon-btn pause-btn" type="button" aria-label="Menu">❚❚</button>
+        <div class="rotate-hint">Rotate your phone for a bigger arena ↻</div>
+      </section>
+
+      <!-- ============================== OVERLAYS ============================== -->
+      <div id="overlay-pause" class="overlay" hidden>
+        <div class="card overlay-card">
+          <h2>Menu</h2>
+          <p class="muted small">Online matches keep running while this menu is open.</p>
+          <label class="toggle"><input type="checkbox" id="opt-mute" /><span class="toggle-ui"></span><span>Mute sound</span></label>
+          <label class="toggle"><input type="checkbox" id="opt-motion" /><span class="toggle-ui"></span><span>Reduce motion &amp; screen shake</span></label>
+          <div class="overlay-actions">
+            <button id="btn-resume" class="btn btn-primary" type="button">Back to game</button>
+            <button id="btn-quit" class="btn btn-ghost" type="button">Leave match</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="overlay-results" class="overlay" hidden>
+        <div class="card overlay-card results-card">
+          <div id="res-outcome" class="res-outcome">YOU WIN!</div>
+          <div id="res-sub" class="muted"></div>
+          <div class="res-score">
+            <div class="res-side res-cyan"><span class="shape shape-circle"></span><span id="res-name-0"></span><strong id="res-score-0">0</strong></div>
+            <div class="res-dash">–</div>
+            <div class="res-side res-orange"><strong id="res-score-1">0</strong><span id="res-name-1"></span><span class="shape shape-diamond"></span></div>
+          </div>
+          <div class="res-meta"><span id="res-duration"></span><span id="res-reason"></span></div>
+          <p id="res-rematch" class="res-rematch" aria-live="polite"></p>
+          <div class="overlay-actions">
+            <button id="btn-again" class="btn btn-go btn-big" type="button">Play Again</button>
+            <div class="row">
+              <button id="btn-res-lobby" class="btn btn-secondary" type="button">Lobby</button>
+              <button id="btn-res-menu" class="btn btn-ghost" type="button">Main Menu</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="overlay-alert" class="overlay" hidden>
+        <div class="card overlay-card">
+          <div id="alert-icon" class="alert-icon">!</div>
+          <h2 id="alert-title"></h2>
+          <p id="alert-message" class="muted"></p>
+          <div id="alert-actions" class="overlay-actions"></div>
+        </div>
+      </div>
+
+      <button id="btn-mute" class="icon-btn mute-btn" type="button" aria-label="Mute sound">🔊</button>
+      <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    </div>
+    <noscript>SNATCH! needs JavaScript to run.</noscript>
+    <script type="module" src="./src/main.ts"></script>
+  </body>
+</html>
