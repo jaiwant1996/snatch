@@ -119,6 +119,7 @@
             <button id="btn-start" class="btn btn-go" type="button" disabled>Start Match</button>
           </div>
           <p id="lobby-hint" class="muted center small"></p>
+          <p class="voice-hint muted center small">🎙 Want to talk? Tap the mic (top-right) or press <kbd>V</kbd>. Voice goes directly between your browsers. Headphones avoid echo.</p>
           <button id="btn-leave-lobby" class="btn btn-ghost btn-sm" type="button">Leave Room</button>
         </div>
       </section>
@@ -199,6 +200,10 @@
       </div>
 
       <button id="btn-mute" class="icon-btn mute-btn" type="button" aria-label="Mute sound">🔊</button>
+      <div id="voice-dock" class="voice-dock" hidden>
+        <button id="btn-opp-voice" class="icon-btn voice-btn opp-voice" type="button" aria-label="Opponent voice"></button>
+        <button id="btn-mic" class="icon-btn voice-btn mic-btn" type="button" aria-label="Turn on voice chat"></button>
+      </div>
       <div id="toast" class="toast" role="status" aria-live="polite"></div>
     </div>
     <noscript>SNATCH! needs JavaScript to run.</noscript>

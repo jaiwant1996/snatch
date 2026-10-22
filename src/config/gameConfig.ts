@@ -78,7 +78,7 @@ export const EVENTS = {
 
 export const NET = {
   /** Appears in every handshake — bump when messages change incompatibly. */
-  protocolVersion: 1,
+  protocolVersion: 2, // v2: voice chat
   /**
    * Trystero application namespace. Peers only discover each other when this
    * matches exactly. If you fork SNATCH! and change gameplay, change this too.

@@ -12,6 +12,8 @@ import { sanitizeName } from './network/messages';
 import { sound } from './ui/audio';
 import { $, copyText, ICONS, setText, toast } from './ui/dom';
 import { Hud } from './ui/hud';
+import { VoiceChat } from './network/voice';
+import { VoiceDock } from './ui/voiceDock';
 import { prefs, reducedMotion, savePrefs, stats } from './ui/prefs';
 
 // ----------------------------------------------------------------- platform
@@ -85,7 +87,9 @@ window.addEventListener('orientationchange', () => setTimeout(refreshScale, 250)
 
 const input = new LocalInput($('#touch-controls'));
 const hud = new Hud();
-const session = new Session(scene, input, hud);
+const voice = new VoiceChat();
+const voiceDock = new VoiceDock(voice);
+const session = new Session(scene, input, hud, voice, voiceDock);
 
 // ----------------------------------------------------------------- prefs / audio
 
@@ -224,4 +228,4 @@ $('#btn-res-lobby').addEventListener('click', () => session.resultsToLobby());
 $('#btn-res-menu').addEventListener('click', () => session.leaveToMenu());
 
 // Exposed for the automated two-browser test only (harmless in production).
-(window as unknown as { __snatch?: unknown }).__snatch = { session, scene };
+(window as unknown as { __snatch?: unknown }).__snatch = { session, scene, voice };

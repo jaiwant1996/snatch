@@ -36,6 +36,8 @@ export interface PeerRoomHandlers {
   onControl: (msg: ControlMsg) => void;
   onInput: (msg: InputMsg) => void;
   onSnapshot: (msg: SnapshotMsg) => void;
+  /** Opponent's microphone audio arrived (voice chat). */
+  onOpponentStream?: (stream: MediaStream) => void;
 }
 
 export class PeerRoom {
@@ -98,6 +100,10 @@ export class PeerRoom {
       this.opponentId = peerId;
       this.handlers.onOpponentJoin(this.pendingHello);
       this.pendingHello = null;
+    };
+    this.room.onPeerStream = (stream, peerId) => {
+      if (this.closed || peerId !== this.opponentId) return; // only the accepted opponent's audio
+      this.handlers.onOpponentStream?.(stream);
     };
     this.room.onPeerLeave = (peerId) => {
       if (this.closed) return;
@@ -183,6 +189,27 @@ export class PeerRoom {
     void this.snap.send(msg as unknown as SnapshotWire, { target: this.opponentId }).catch(() => {});
   }
 
+  /**
+   * Voice chat: attach a local audio stream to the opponent's existing peer
+   * connection. Trystero renegotiates the WebRTC session over the data channel,
+   * so audio flows directly browser-to-browser like the game traffic.
+   */
+  addAudio(stream: MediaStream): void {
+    if (!this.opponentId || this.closed) return;
+    for (const p of this.room.addStream(stream, { target: this.opponentId, metadata: { kind: 'voice' } })) {
+      void p.catch(() => {});
+    }
+  }
+
+  removeAudio(stream: MediaStream): void {
+    if (this.closed) return;
+    try {
+      this.room.removeStream(stream);
+    } catch {
+      /* peer already gone */
+    }
+  }
+
   async ping(): Promise<number | null> {
     if (!this.opponentId) return null;
     try {
@@ -219,6 +246,7 @@ export class PeerRoom {
     this.snap.onMessage = null;
     this.room.onPeerJoin = null;
     this.room.onPeerLeave = null;
+    this.room.onPeerStream = null;
     this.opponentId = null;
     try {
       await this.room.leave();

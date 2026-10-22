@@ -235,6 +235,33 @@ kbd {
 .pause-btn { top: 12px; left: calc(12px + var(--safe-l)); font-size: 0.8rem; letter-spacing: -2px; }
 body:not([data-screen='game']) .pause-btn { display: none; }
 
+/* ------------------------------------------------------------- voice */
+.voice-dock {
+  position: fixed; z-index: 40; top: 12px; right: calc(64px + var(--safe-r));
+  display: flex; gap: 8px;
+}
+.voice-dock .icon-btn { position: relative; top: auto; right: auto; left: auto; color: var(--muted); }
+.voice-btn::after {
+  /* speaking ring driven by --lvl (0..1) */
+  content: ''; position: absolute; inset: -3px; border-radius: 14px; pointer-events: none;
+  box-shadow: 0 0 0 calc(var(--lvl, 0) * 5px) rgba(185, 255, 92, 0.55);
+  transition: box-shadow 0.08s linear;
+}
+.mic-btn[data-state='live'] { color: #1a2a04; background: var(--go); border-color: var(--go); }
+.mic-btn[data-state='muted'] { color: var(--danger); border-color: rgba(255, 90, 106, 0.6); }
+.mic-btn[data-state='requesting'] { color: var(--token); animation: pulse 0.9s ease-in-out infinite; }
+.mic-btn[data-state='error'] { color: var(--danger); }
+.opp-voice[data-state='off'] { opacity: 0.45; }
+.opp-voice[data-state='live'] { color: var(--text); border-color: rgba(185, 255, 92, 0.6); }
+.opp-voice[data-state='muted'] { color: var(--muted); }
+.opp-voice[data-state='silenced'] { color: var(--danger); }
+.opp-voice[data-state='gesture'] { color: var(--token); border-color: var(--token); animation: pulse 0.9s ease-in-out infinite; }
+body.voice-ui .hud { padding-right: calc(166px + var(--safe-r)); }
+.voice-hint { margin: -8px 0 0; }
+body:not(.voice-ui) .voice-hint { display: none; }
+@media (max-height: 520px) { .voice-dock { top: 8px; right: calc(56px + var(--safe-r)); } body.voice-ui .hud { padding-right: calc(148px + var(--safe-r)); } }
+@media (max-width: 560px) { body.voice-ui .hud { padding-right: calc(150px + var(--safe-r)); } body.voice-ui .hud-name { display: none; } }
+
 /* ----------------------------------------------------------- connecting */
 .status-card { width: min(440px, 100%); text-align: center; display: grid; gap: 10px; justify-items: center; }
 .status-card h2 { margin: 6px 0 0; }

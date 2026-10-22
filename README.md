@@ -7,6 +7,7 @@ A real-time 1v1 browser arcade duel. Two friends share a six-character room code
 - **No accounts, no backend you deploy, no database.** The site is a static bundle on GitHub Pages.
 - **Host-authoritative peer-to-peer.** The room creator's browser runs the official simulation; the guest sends only inputs.
 - **Desktop + mobile.** Keyboard on desktop; virtual joystick and dash button on touch devices.
+- **Peer-to-peer voice chat.** Talk while you play; audio goes directly between the two browsers on the same connection as the game.
 - **Stack:** TypeScript · Vite · Phaser 3 · Trystero (WebRTC data channels) · plain HTML/CSS · GitHub Actions.
 
 | Arena (guest view, boost-pad event) | Lobby |
@@ -119,6 +120,24 @@ Local-only extras: your nickname, mute/reduce-motion preferences, and a small *"
 
 ---
 
+## 4b. Voice chat
+
+Once an opponent is connected, two buttons appear at the top-right (next to the sound button):
+
+| Button | What it does |
+|---|---|
+| 🎙 **Your mic** | First tap asks for microphone permission and starts sending your voice. After that it toggles **mute/unmute** instantly. Keyboard: **V**. Green = live, red = muted. A ring pulses with your voice level. |
+| 🎧 **Opponent** | Shows the opponent's mic state (off / live / muted) with a speaking ring. Tap to **silence them on your side only**. If your browser blocked audio autoplay it pulses yellow — tap once to hear them. |
+
+How it works and what to expect:
+
+- **P2P only.** Your microphone track is added to the *same* WebRTC peer connection the game already uses; Trystero renegotiates it over the existing data channel. No media server, no new service, nothing to deploy. If the game connected, voice will too.
+- **Opt-in, per player.** Nobody's mic opens automatically. Each player decides independently; you can listen without talking.
+- **Lives with the pairing, not the match.** Voice keeps working through lobby → match → results → rematch. When the opponent leaves or you leave the room, your microphone is released (the browser's mic indicator turns off).
+- Browser processing is on: echo cancellation, noise suppression, auto gain. **Headphones still give the best result** — game sounds + speakers + mic can echo.
+- **Requires HTTPS** (browsers only expose the microphone on secure origins). On `http://` the mic button explains this instead of failing silently.
+- Bandwidth: Opus voice is roughly 30–50 kbit/s each way — negligible next to video, fine on mobile data.
+
 ## 5. Architecture
 
 ```
@@ -175,7 +194,8 @@ The Phaser render loop **sleeps** whenever you're not in a match, so menus and l
 | Channel | Messages |
 |---|---|
 | Handshake (before a peer is admitted) | `hello` (app, protocol version, role, nickname, room) · `verdict` (accepted / `full` / `version` / `role` / `room`) |
-| `ctl` (reliable control) | `lobby` (name, ready, arena-events setting) · `start` (match id) · `abort` · `end` (winner, scores, duration, reason) · `rematch` · `toLobby` · `leave` · `focus` (tab hidden/visible) |
+| `ctl` (reliable control) | `lobby` (name, ready, arena-events setting) · `start` (match id) · `abort` · `end` (winner, scores, duration, reason) · `rematch` · `toLobby` · `leave` · `focus` (tab hidden/visible) · `voice` (mic on / muted) |
+| Media (WebRTC audio track) | Opponent's microphone, Opus codec, same peer connection (protocol v2) |
 | `inp` (guest → host) | `{m: matchId, s: seq, x, y, d: dashCount}` |
 | `snap` (host → guest) | phase, timers, scores, both players, token, arena event, effect events, input ack, pause state |
 
@@ -245,7 +265,7 @@ If you fork the game and change gameplay, **change `NET.appId`** (and/or bump `N
 
 ### Unit tests — `npm test`
 
-44 tests covering: countdown, acceleration and friction, diagonal normalisation, carry slowdown, untrusted-input clamping, wall/obstacle collision, dash speed/duration/cooldown, pickup, carry-follow, tackle drops near the collision, 300–400 ms pickup lockout, post-hit immunity, one-hit-per-dash, bump vs. steal, walking never steals, own-gate scoring (exactly once), wrong-gate and no-token cases, reset after goal, first-to-three, timer win, sudden death, clock frozen during celebrations, deterministic arena events; room-code alphabet/bias/uniqueness/normalisation/invite URLs; handshake decisions (full room, role clash, version mismatch), message validation, snapshot round-trip/tamper rejection, stale/duplicate/foreign-match snapshot rejection and event de-duplication.
+45 tests covering: voice-status message validation, countdown, acceleration and friction, diagonal normalisation, carry slowdown, untrusted-input clamping, wall/obstacle collision, dash speed/duration/cooldown, pickup, carry-follow, tackle drops near the collision, 300–400 ms pickup lockout, post-hit immunity, one-hit-per-dash, bump vs. steal, walking never steals, own-gate scoring (exactly once), wrong-gate and no-token cases, reset after goal, first-to-three, timer win, sudden death, clock frozen during celebrations, deterministic arena events; room-code alphabet/bias/uniqueness/normalisation/invite URLs; handshake decisions (full room, role clash, version mismatch), message validation, snapshot round-trip/tamper rejection, stale/duplicate/foreign-match snapshot rejection and event de-duplication.
 
 ### Automated two-browser test — `npm run build:e2e && npm run test:e2e`
 
@@ -289,6 +309,9 @@ Builds a test variant where only **peer discovery** is swapped for a local WebSo
 | *"Connection hiccup — waiting for opponent…"* | Packets stopped for >1.5 s (Wi-Fi drop, tab throttling). It resumes on its own; if it never does, the peer is gone. |
 | Black/blank arena or very low FPS | Graphics driver issue. Open the game with `?renderer=canvas` (e.g. `…/snatch/?renderer=canvas`) to use the Canvas renderer. |
 | No sound | Click/tap once (browsers require a gesture), check the mute button and device volume. |
+| Mic button says permission blocked | Click the lock/tune icon in the address bar → Microphone → Allow, then tap the mic again. On phones also check OS settings → browser → Microphone. |
+| Can't hear the opponent | Check their mic isn't red (muted) on their side, that the 🎧 button isn't red (silenced by you), and tap it if it's pulsing yellow (autoplay blocked). |
+| Echo / feedback | One of you is on speakers — use headphones, or lower speaker volume. |
 | GitHub Pages shows 404 | Settings → Pages → Source must be **GitHub Actions**; wait for the workflow to finish; the URL includes the repo name (`/snatch/`). |
 | Workflow fails at "Deploy" | Pages not enabled yet (step 3 in §2), or an environment protection rule blocks `main`. |
 
@@ -301,7 +324,7 @@ Builds a test variant where only **peer discovery** is swapped for a local WebSo
 | Item | Status |
 |---|---|
 | `npm run build` (type-check + production build, relative asset paths) | ✅ verified |
-| 44 unit tests | ✅ passing |
+| 45 unit tests | ✅ passing |
 | Two browser contexts create/join the same lobby over real WebRTC (local discovery relay), full match flow, rematch, disconnect, third-player refusal, timeout, mobile controls — 36–37 automated checks | ✅ passing in headless Chromium on one machine |
 | Production build served under a sub-path (`/snatch/`) | ✅ verified (e2e) |
 | **Discovery through public Nostr relays** | ⚠️ **not verified** — the build sandbox blocks outbound WebSockets to those relays; the "relays unreachable" warning path was exercised instead |
@@ -309,6 +332,8 @@ Builds a test variant where only **peer discovery** is swapped for a local WebSo
 | **GitHub Actions deployment** | ⚠️ **not run** — workflow written against current action majors (checkout v7, setup-node v7, configure-pages v6, upload-pages-artifact v5, deploy-pages v5) but not executed |
 | Real iOS Safari / Android Chrome hardware | ⚠️ not verified (mobile layout + touch input tested in an emulated mobile viewport) |
 | Audio output | ⚠️ not verified by ear (code paths run; headless browsers have no speakers) |
+| Voice chat: permission → live, audio track received and flowing (non-zero level) both ways, V-key mute shown to the opponent, local silencing, mic released when the opponent leaves | ✅ passing in the automated two-browser test (Chromium fake microphone) |
+| Voice chat on real devices / across networks / iOS Safari | ⚠️ not verified — test with two phones or laptop + phone |
 
 ---
 

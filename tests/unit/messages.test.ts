@@ -50,6 +50,11 @@ describe('message validation', () => {
     expect(parseControl({ t: 'lobby', name: 'Bo', ready: true, events: false })).toEqual({ t: 'lobby', name: 'Bo', ready: true, events: false });
   });
 
+  it('validates voice status messages', () => {
+    expect(parseControl({ t: 'voice', on: true, muted: false })).toEqual({ t: 'voice', on: true, muted: false });
+    expect(parseControl({ t: 'voice', on: 'yes', muted: false })).toBeNull();
+  });
+
   it('clamps guest input and rejects garbage', () => {
     expect(parseInput({ m: 'abcdef12', s: 1, x: 9, y: -9, d: 3 })).toEqual({ m: 'abcdef12', s: 1, x: 1, y: -1, d: 3 });
     expect(parseInput({ m: 'abcdef12', s: 1, x: 'left', y: 0, d: 0 })).toBeNull();

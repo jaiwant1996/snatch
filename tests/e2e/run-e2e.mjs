@@ -88,10 +88,16 @@ const hostState = (page) =>
 const mutateHost = (page, code) => page.evaluate(code);
 
 const browser = await chromium.launch({
-  args: ['--disable-features=WebRtcHideLocalIpsWithMdns', '--autoplay-policy=no-user-gesture-required'],
+  args: [
+    '--disable-features=WebRtcHideLocalIpsWithMdns',
+    '--autoplay-policy=no-user-gesture-required',
+    // Fake microphone (a test tone) + auto-accept the permission prompt, for the voice-chat test.
+    '--use-fake-ui-for-media-stream',
+    '--use-fake-device-for-media-stream',
+  ],
 });
-const ctxA = await browser.newContext({ viewport: { width: 1280, height: 800 } });
-const ctxB = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+const ctxA = await browser.newContext({ viewport: { width: 1280, height: 800 }, permissions: ['microphone'] });
+const ctxB = await browser.newContext({ viewport: { width: 1280, height: 800 }, permissions: ['microphone'] });
 const A = await ctxA.newPage();
 const B = await ctxB.newPage();
 const consoleErrors = [];
@@ -298,6 +304,38 @@ try {
   await sleep(1500);
   await B.screenshot({ path: path.join(SHOTS, '11b-arena-event-guest.png') });
 
+  // ------------------------------------------------------------ voice chat
+  check('V1. voice dock shown while paired', await A.isVisible('#btn-mic') && await B.isVisible('#btn-opp-voice'));
+  await B.click('#btn-mic'); // guest turns on the mic
+  const bLive = await waitFor(B, () => document.querySelector('#btn-mic').dataset.state === 'live', null, 8000);
+  check('V2. guest microphone starts (permission → live)', bLive);
+  const aHears = await waitFor(A, () => {
+    const v = window.__snatch.voice.state;
+    return v.remoteConnected && v.remote === 'live';
+  }, null, 10000);
+  check('V3. host receives the guest audio track over the peer connection', aHears);
+  const aLevel = await waitFor(A, () => window.__snatch.voice.state.remoteLevel > 0.01, null, 8000);
+  const track = await A.evaluate(() => {
+    const el = [...document.querySelectorAll('audio')].find((a) => a.srcObject);
+    const t = el?.srcObject?.getAudioTracks?.()[0];
+    return t ? `${t.readyState}/${t.muted ? 'muted' : 'flowing'}/paused=${el.paused}` : 'none';
+  });
+  check('    audio actually flows (non-zero level at the host, playing)', aLevel && track.startsWith('live'), track);
+  await A.click('#btn-mic'); // host joins the call too
+  const bHears = await waitFor(B, () => window.__snatch.voice.state.remoteConnected && window.__snatch.voice.state.remote === 'live', null, 10000);
+  check('V4. two-way: guest hears the host', bHears);
+  await B.keyboard.press('KeyV'); // guest mutes with the hotkey
+  const mutedSeen = await waitFor(A, () => window.__snatch.voice.state.remote === 'muted', null, 4000);
+  check('V5. "V" mutes the mic and the opponent sees "muted"', mutedSeen && (await B.getAttribute('#btn-mic', 'data-state')) === 'muted');
+  await B.keyboard.press('KeyV');
+  await waitFor(A, () => window.__snatch.voice.state.remote === 'live', null, 4000);
+  await A.click('#btn-opp-voice'); // host silences the guest locally
+  check('V6. silencing the opponent mutes playback locally', await A.evaluate(() => [...document.querySelectorAll('audio')].some((a) => a.srcObject && a.muted)));
+  await A.click('#btn-opp-voice');
+  const gameStill = (await hostState(A))?.phase;
+  check('    game keeps running during the call', !!gameStill, gameStill);
+  await A.screenshot({ path: path.join(SHOTS, '11c-voice-host.png') });
+
   // ------------------------------------------------------------ disconnect
   await ctxB.close();
   const dc = await waitFor(A, () => !document.querySelector('#overlay-alert').hidden, null, 20000);
@@ -308,6 +346,7 @@ try {
   await A.screenshot({ path: path.join(SHOTS, '12-disconnected.png') });
   await A.click('#alert-actions .btn-primary');
   check('    host can return to the open lobby', (await screen(A)) === 'lobby' && (await A.textContent('#lobby-status'))?.includes('Waiting'));
+  check('V7. host microphone released when the opponent left', await A.evaluate(() => window.__snatch.voice.state.mic === 'off' && document.querySelector('#voice-dock').hidden));
 
   // ------------------------------------------------------------ mobile layout
   const ctxM = await browser.newContext({ viewport: { width: 844, height: 390 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });

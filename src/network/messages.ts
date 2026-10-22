@@ -92,6 +92,15 @@ export interface FocusMsg {
   hidden: boolean;
 }
 
+/** Voice-chat status, so each side can show the other's mic state. */
+export interface VoiceMsg {
+  t: 'voice';
+  /** Microphone stream is attached. */
+  on: boolean;
+  /** Attached but muted (track disabled). */
+  muted: boolean;
+}
+
 export type ControlMsg =
   | LobbyMsg
   | StartMsg
@@ -100,7 +109,8 @@ export type ControlMsg =
   | RematchMsg
   | ToLobbyMsg
   | LeaveMsg
-  | FocusMsg;
+  | FocusMsg
+  | VoiceMsg;
 
 // ---------------------------------------------------------------------------
 // Hot path
@@ -246,6 +256,9 @@ export function parseControl(v: unknown): ControlMsg | null {
     case 'focus':
       if (!isBool(v.hidden)) return null;
       return { t: 'focus', hidden: v.hidden };
+    case 'voice':
+      if (!isBool(v.on) || !isBool(v.muted)) return null;
+      return { t: 'voice', on: v.on, muted: v.muted };
     default:
       return null;
   }

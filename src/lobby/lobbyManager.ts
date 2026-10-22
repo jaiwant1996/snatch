@@ -23,6 +23,8 @@ import type { Hud } from '../ui/hud';
 import { renderLobby } from '../ui/lobby';
 import { hideAllOverlays, hideOverlay, isOverlayOpen, setRematchStatus, showAlert, showResults } from '../ui/overlays';
 import { prefs, recordResult, savePrefs } from '../ui/prefs';
+import type { VoiceChat } from '../network/voice';
+import type { VoiceDock } from '../ui/voiceDock';
 import { generateRoomCode } from './roomCode';
 
 type Phase = 'idle' | 'connecting' | 'lobby' | 'match' | 'results';
@@ -52,7 +54,10 @@ export class Session {
     private scene: ArenaScene,
     private input: LocalInput,
     private hud: Hud,
+    private voice: VoiceChat,
+    private voiceDock: VoiceDock,
   ) {
+    voice.onAnnounce = (on, muted) => this.room?.sendControl({ t: 'voice', on, muted });
     document.addEventListener('visibilitychange', () => this.onVisibility());
     window.addEventListener('pagehide', () => void this.room?.leave());
     input.onPause = () => this.togglePause();
@@ -136,7 +141,9 @@ export class Session {
       onControl: guard((msg: ControlMsg) => this.onControl(msg)),
       onInput: guard((msg) => this.host?.onGuestInput(msg)),
       onSnapshot: guard((msg) => this.guest?.onSnapshot(msg)),
+      onOpponentStream: guard((stream: MediaStream) => this.voice.receiveStream(stream)),
     });
+    this.voice.attachRoom(this.room);
   }
 
   private scheduleRelayCheck(): void {
@@ -168,6 +175,8 @@ export class Session {
     toast(this.role === 'host' ? `${hello.name} joined your room` : `Connected to ${hello.name}'s room`);
     this.sendLobby();
     this.startPing();
+    this.voice.opponentJoined();
+    this.voiceDock.setVisible(true, hello.name);
     this.render();
   }
 
@@ -222,6 +231,8 @@ export class Session {
   private onOpponentGone(): void {
     if (!this.opp) return;
     const name = this.opp.name;
+    this.voice.opponentLeft();
+    this.voiceDock.setVisible(false);
     this.opp = null;
     this.myReady = false;
     this.starting = false;
@@ -317,6 +328,10 @@ export class Session {
 
       case 'focus':
         if (this.role === 'host') this.host?.setGuestHidden(msg.hidden);
+        break;
+
+      case 'voice':
+        this.voice.remoteStatus(msg.on, msg.muted);
         break;
     }
   }
@@ -492,6 +507,8 @@ export class Session {
     this.clearTimers();
     this.gen++; // invalidate callbacks from the old room
     const r = this.room;
+    this.voice.attachRoom(null); // releases the microphone and remote audio
+    this.voiceDock.setVisible(false);
     this.room = null;
     this.opp = null;
     this.myReady = false;
