@@ -7,6 +7,7 @@ A real-time 1v1 browser arcade duel. Two friends share a six-character room code
 - **No accounts, no backend you deploy, no database.** The site is a static bundle on GitHub Pages.
 - **Host-authoritative peer-to-peer.** The room creator's browser runs the official simulation; the guest sends only inputs.
 - **Desktop + mobile.** Keyboard on desktop; virtual joystick and dash button on touch devices.
+- **Open lobbies on the home page.** Public rooms are listed live for every visitor; one click to join. Private rooms (code/link only) are still available.
 - **Peer-to-peer voice chat.** Talk while you play; audio goes directly between the two browsers on the same connection as the game.
 - **Stack:** TypeScript · Vite · Phaser 3 · Trystero (WebRTC data channels) · plain HTML/CSS · GitHub Actions.
 
@@ -114,7 +115,25 @@ Sound is synthesised in the browser (no audio files). Use the speaker button to 
 - Both players press **Ready**; then the host presses **Start Match**. Everyone sees the same 3-2-1-GO countdown.
 - After a match, both press **Play Again** to rematch over the same connection (no re-pairing). **Lobby** returns both players to the lobby. **Main Menu** leaves the room.
 
-There is no room registry. A code is just a rendezvous name: if you type a code nobody is hosting, you sit in an empty room until the **25-second timeout** tells you no host was found. A third person who opens a full room is refused with *"Room is full"*.
+A code is just a rendezvous name: if you type a code nobody is hosting, you sit in an empty room until the **25-second timeout** tells you no host was found. A third person who opens a full room is refused with *"Room is full"*.
+
+### Public rooms and the "Open lobbies" list
+
+- Under **Create Room** there's a **List my room publicly** switch (on by default, remembered per browser). The host can also flip **Public room** in the lobby at any time.
+- While a public room is **waiting for an opponent**, it appears in **Open lobbies** on everyone's home page with the host's nickname, room code, how long it's been waiting and whether arena events are on. Visitors click **Join** — that's the same join flow as typing the code.
+- As soon as someone joins, the room disappears from everyone's list. If they leave, it's listed again. Switching to private, leaving, or starting a match also removes it.
+- **Private rooms are never announced** — only people with the code or invite link can find them.
+
+**How it works without a server.** There's still no database or backend. A host announces its open room as a tiny, short-lived ("ephemeral") Nostr event on six of the same public relays Trystero already uses to pair browsers — every 12 s, and immediately when a new visitor arrives and asks *"who's open?"*. Relays forward these to whoever is listening but don't store them. Each visitor builds the list in their own browser; a listing expires 45 s after its host goes silent (e.g. closed tab), and an explicit *closed* message removes it instantly in the normal case. Relay sockets for the list are only open while you're on the home page or hosting a public room.
+
+**Safety rules built in:** every message is validated and nicknames are sanitised; only the browser that first announced a code can update or close that listing; incompatible game versions are hidden; the list is capped at 40 rooms; hosts answer queries at most once every 3 s.
+
+**What this means in practice:**
+- **Public means public.** Anyone who opens the site can see your nickname and join. There's no moderation or blocking — use a private room for friends.
+- The list is **best-effort**. If the relays are slow or blocked on your network, the status dot turns red (*Directory unreachable*) and the list may be empty even when rooms exist; joining by code still works.
+- A listing can be up to ~45 s stale if a host's tab crashed. Joining it ends in *No host found*, and it's removed from your list.
+- Keep a public room's tab **in the foreground**: background tabs get throttled and the listing may flicker out.
+- Anyone can technically publish a fake listing to those relays. Joining one just times out; it can't affect a real game.
 
 Local-only extras: your nickname, mute/reduce-motion preferences, and a small *"This device: N played · W–L"* record are kept in `localStorage`. They never leave your browser and are **not** a leaderboard.
 
@@ -194,6 +213,7 @@ The Phaser render loop **sleeps** whenever you're not in a match, so menus and l
 | Channel | Messages |
 |---|---|
 | Handshake (before a peer is admitted) | `hello` (app, protocol version, role, nickname, room) · `verdict` (accepted / `full` / `version` / `role` / `room`) |
+| Directory (Nostr ephemeral events, not WebRTC) | `q` (who's open?) · `a` (announce: code, nickname, events, protocol, seconds open) · `x` (closed) |
 | `ctl` (reliable control) | `lobby` (name, ready, arena-events setting) · `start` (match id) · `abort` · `end` (winner, scores, duration, reason) · `rematch` · `toLobby` · `leave` · `focus` (tab hidden/visible) · `voice` (mic on / muted) |
 | Media (WebRTC audio track) | Opponent's microphone, Opus codec, same peer connection (protocol v2) |
 | `inp` (guest → host) | `{m: matchId, s: seq, x, y, d: dashCount}` |
@@ -233,7 +253,10 @@ snatch/
 │   │   └── ArenaScene.ts         # Phaser rendering + effects
 │   ├── network/
 │   │   ├── peerRoom.ts           # Trystero wrapper + admission handshake
-│   │   └── messages.ts           # message types, validators, snapshot codec
+│   │   ├── messages.ts           # message types, validators, snapshot codec
+│   │   ├── voice.ts              # P2P voice chat (mic track on the game connection)
+│   │   ├── directory.ts          # open-lobby list protocol (announce / query / close)
+│   │   └── directoryTransport.ts # Nostr pub/sub used by the lobby list
 │   ├── lobby/
 │   │   ├── lobbyManager.ts       # session state machine
 │   │   └── roomCode.ts           # code generation/validation, invite URLs
@@ -265,7 +288,7 @@ If you fork the game and change gameplay, **change `NET.appId`** (and/or bump `N
 
 ### Unit tests — `npm test`
 
-45 tests covering: voice-status message validation, countdown, acceleration and friction, diagonal normalisation, carry slowdown, untrusted-input clamping, wall/obstacle collision, dash speed/duration/cooldown, pickup, carry-follow, tackle drops near the collision, 300–400 ms pickup lockout, post-hit immunity, one-hit-per-dash, bump vs. steal, walking never steals, own-gate scoring (exactly once), wrong-gate and no-token cases, reset after goal, first-to-three, timer win, sudden death, clock frozen during celebrations, deterministic arena events; room-code alphabet/bias/uniqueness/normalisation/invite URLs; handshake decisions (full room, role clash, version mismatch), message validation, snapshot round-trip/tamper rejection, stale/duplicate/foreign-match snapshot rejection and event de-duplication.
+60 tests covering: lobby directory (late-joiner query/answer, live announcements, instant close, expiry of silent hosts, owner-only updates, version filtering, listing cap, age without clock trust, own-room filtering, idle socket closing, query-flood rate limiting, message validation, deterministic relay choice), voice-status message validation, countdown, acceleration and friction, diagonal normalisation, carry slowdown, untrusted-input clamping, wall/obstacle collision, dash speed/duration/cooldown, pickup, carry-follow, tackle drops near the collision, 300–400 ms pickup lockout, post-hit immunity, one-hit-per-dash, bump vs. steal, walking never steals, own-gate scoring (exactly once), wrong-gate and no-token cases, reset after goal, first-to-three, timer win, sudden death, clock frozen during celebrations, deterministic arena events; room-code alphabet/bias/uniqueness/normalisation/invite URLs; handshake decisions (full room, role clash, version mismatch), message validation, snapshot round-trip/tamper rejection, stale/duplicate/foreign-match snapshot rejection and event de-duplication.
 
 ### Automated two-browser test — `npm run build:e2e && npm run test:e2e`
 
@@ -287,6 +310,7 @@ Builds a test variant where only **peer discovery** is swapped for a local WebSo
 ## 10. Limitations (read this)
 
 - **Connectivity is not guaranteed.** WebRTC without a TURN relay fails for some network pairs (symmetric NAT, strict corporate firewalls, some carrier-grade NAT). The game reports this clearly; it does not fall back to a server. Fix by trying another network or adding a TURN server (see below).
+- **The open-lobby list is best-effort** (public relays, no server) and **public rooms have no moderation**: anyone can see your nickname and join. See §4.
 - **Signalling depends on public Nostr relays** that you don't control. If they're down or blocked, peers can't find each other (the game warns after ~9 s when no relay is reachable).
 - **Host advantage**: the host has zero input latency; the guest has ~½ RTT.
 - **No host migration, no reconnection into a running match.** If the host leaves, the match ends; a dropped guest must rejoin the lobby.
@@ -304,6 +328,8 @@ Builds a test variant where only **peer discovery** is swapped for a local WebSo
 | *"No host found"* after 25 s | Wrong code; host closed the lobby or their tab is asleep; or the two networks can't connect directly. Re-check the code, keep the host's tab in the foreground, retry; try a phone hotspot on one side. |
 | *"Can't reach the public signalling relays"* | Network, VPN, firewall or a privacy extension is blocking WebSocket connections to Nostr relays. Try another network or disable the extension for the site. |
 | *"Direct connection failed"* | Peers found each other but WebRTC couldn't connect (NAT/firewall). Switch one player to another network, or add TURN (below). |
+| Open lobbies says *Directory unreachable* / list always empty | The public relays are blocked or slow on this network (VPN, firewall, ad/privacy blocker). Rooms still work by code. Try another network or allow WebSocket connections for the site. |
+| Clicked Join on a listed room → *No host found* | The host closed their tab without a goodbye (listings can be ~45 s stale). It's removed from your list; pick another. |
 | *"Room is full"* | Two players are already in that room. Ask for a new code. |
 | *"Version mismatch"* | One of you has an old cached build. Both hard-refresh (Ctrl/Cmd+Shift+R). |
 | *"Connection hiccup — waiting for opponent…"* | Packets stopped for >1.5 s (Wi-Fi drop, tab throttling). It resumes on its own; if it never does, the peer is gone. |
@@ -324,7 +350,9 @@ Builds a test variant where only **peer discovery** is swapped for a local WebSo
 | Item | Status |
 |---|---|
 | `npm run build` (type-check + production build, relative asset paths) | ✅ verified |
-| 45 unit tests | ✅ passing |
+| 60 unit tests | ✅ passing |
+| Open lobbies: listed for visitors, Join from the list, removed when full, re-listed when the guest leaves, removed when made private, private rooms never listed | ✅ passing in the automated multi-browser test (local relay standing in for Nostr) |
+| Open lobbies over the **real public Nostr relays** | ⚠️ not verified — the build sandbox can't reach them. Check with two devices after deploying |
 | Two browser contexts create/join the same lobby over real WebRTC (local discovery relay), full match flow, rematch, disconnect, third-player refusal, timeout, mobile controls — 36–37 automated checks | ✅ passing in headless Chromium on one machine |
 | Production build served under a sub-path (`/snatch/`) | ✅ verified (e2e) |
 | **Discovery through public Nostr relays** | ⚠️ **not verified** — the build sandbox blocks outbound WebSockets to those relays; the "relays unreachable" warning path was exercised instead |

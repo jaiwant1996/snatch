@@ -10,18 +10,26 @@ import { fileURLToPath } from 'node:url';
  *
  * Override with BASE_PATH=/my-repo/ if you ever need an absolute base.
  *
- * `--mode e2e` swaps the default Trystero (Nostr) strategy for a local WebSocket
- * relay so the automated two-browser test can run offline. Production builds
- * never include that shim.
+ * `--mode e2e` swaps the default Trystero (Nostr) strategy — and the lobby
+ * directory transport — for a local WebSocket relay, so the automated
+ * two-browser test can run offline. Production builds never include those shims.
  */
 export default defineConfig(({ mode }) => ({
   base: process.env.BASE_PATH ?? './',
   resolve:
     mode === 'e2e'
       ? {
-          alias: {
-            trystero: fileURLToPath(new URL('./tests/e2e/trysteroLocalRelay.ts', import.meta.url)),
-          },
+          alias: [
+            { find: /^trystero$/, replacement: fileURLToPath(new URL('./tests/e2e/trysteroLocalRelay.ts', import.meta.url)) },
+            {
+              find: /^\.\/directoryTransport$/,
+              replacement: fileURLToPath(new URL('./tests/e2e/directoryTransportLocal.ts', import.meta.url)),
+            },
+            {
+              find: /^\.\/network\/directoryTransport$/,
+              replacement: fileURLToPath(new URL('./tests/e2e/directoryTransportLocal.ts', import.meta.url)),
+            },
+          ],
         }
       : undefined,
   build: {

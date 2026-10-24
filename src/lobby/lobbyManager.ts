@@ -25,6 +25,7 @@ import { hideAllOverlays, hideOverlay, isOverlayOpen, setRematchStatus, showAler
 import { prefs, recordResult, savePrefs } from '../ui/prefs';
 import type { VoiceChat } from '../network/voice';
 import type { VoiceDock } from '../ui/voiceDock';
+import type { LobbyDirectory } from '../network/directory';
 import { generateRoomCode } from './roomCode';
 
 type Phase = 'idle' | 'connecting' | 'lobby' | 'match' | 'results';
@@ -38,6 +39,8 @@ export class Session {
   private myReady = false;
   private opp: { name: string; ready: boolean } | null = null;
   private eventsEnabled = prefs.arenaEvents;
+  /** Host: list this room on the public home-page directory. */
+  private isPublic = prefs.publicRooms;
   private phase: Phase = 'idle';
   private starting = false;
   private relayWarning: string | null = null;
@@ -56,6 +59,7 @@ export class Session {
     private hud: Hud,
     private voice: VoiceChat,
     private voiceDock: VoiceDock,
+    private directory: LobbyDirectory,
   ) {
     voice.onAnnounce = (on, muted) => this.room?.sendControl({ t: 'voice', on, muted });
     document.addEventListener('visibilitychange', () => this.onVisibility());
@@ -65,8 +69,9 @@ export class Session {
 
   // ------------------------------------------------------------------ entry
 
-  createRoom(name: string): void {
+  createRoom(name: string, isPublic = prefs.publicRooms): void {
     this.reset();
+    this.isPublic = isPublic;
     this.role = 'host';
     this.code = generateRoomCode();
     this.myName = name;
@@ -102,6 +107,7 @@ export class Session {
         if (gen !== this.gen || this.phase !== 'connecting') return;
         const code = this.code;
         this.leave();
+        this.directory.forget(code); // stale listing — drop it from our list
         showScreen('menu');
         showAlert({
           title: 'No host found',
@@ -184,8 +190,9 @@ export class Session {
     if (this.phase !== 'connecting') return;
     const code = this.code;
     this.leave();
+    if (reason === 'full') this.directory.forget(code);
     const messages: Record<RejectReason, [string, string]> = {
-      full: ['Room is full', `Room ${code} already has two players. Ask your friend for a fresh code.`],
+      full: ['Room is full', `Room ${code} already has two players — someone got there first. Pick another open room or create your own.`],
       version: [
         'Version mismatch',
         'You and the host are running different versions of SNATCH!. Both of you should refresh the page, then try again.',
@@ -385,6 +392,7 @@ export class Session {
     this.stopMatch();
     hideAllOverlays();
     this.currentMatchId = matchId;
+    this.directory.setHosted(null);
     this.phase = 'match';
     this.starting = false;
     this.rematch = { me: false, opp: false };
@@ -508,6 +516,7 @@ export class Session {
     this.gen++; // invalidate callbacks from the old room
     const r = this.room;
     this.voice.attachRoom(null); // releases the microphone and remote audio
+    this.directory.setHosted(null); // tells everyone the room is gone
     this.voiceDock.setVisible(false);
     this.room = null;
     this.opp = null;
@@ -572,7 +581,26 @@ export class Session {
     this.intervals = [];
   }
 
+  /**
+   * Keep the public directory in sync: a host advertises only while the room is
+   * public, still waiting for an opponent, and not starting.
+   */
+  private updateListing(): void {
+    const open =
+      this.role === 'host' && this.phase === 'lobby' && !!this.room && !this.opp && this.isPublic && !this.starting;
+    this.directory.setHosted(open ? { code: this.code, name: this.myName, events: this.eventsEnabled } : null);
+  }
+
+  setPublic(on: boolean): void {
+    if (this.role !== 'host') return;
+    this.isPublic = on;
+    prefs.publicRooms = on;
+    savePrefs();
+    this.render();
+  }
+
   private render(): void {
+    this.updateListing();
     if (this.phase !== 'lobby' && this.phase !== 'connecting') return;
     renderLobby({
       code: this.code,
@@ -581,6 +609,7 @@ export class Session {
       myReady: this.myReady,
       opp: this.opp,
       eventsEnabled: this.eventsEnabled,
+      isPublic: this.isPublic,
       starting: this.starting,
       relayWarning: this.relayWarning,
     });

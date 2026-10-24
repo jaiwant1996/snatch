@@ -9,6 +9,7 @@ export interface LobbyViewState {
   myReady: boolean;
   opp: { name: string; ready: boolean } | null;
   eventsEnabled: boolean;
+  isPublic: boolean;
   starting: boolean;
   relayWarning: string | null;
 }
@@ -59,6 +60,19 @@ export function renderLobby(s: LobbyViewState): void {
   start.disabled = !(s.opp && s.opp.ready && s.myReady) || s.starting;
   $('.lobby-actions').style.gridTemplateColumns = s.role === 'host' ? '1fr 1fr' : '1fr';
 
+  const pub = $<HTMLInputElement>('#public-lobby-toggle');
+  pub.checked = s.isPublic;
+  pub.disabled = s.starting;
+  $('#public-lobby-wrap').hidden = s.role !== 'host';
+  setText(
+    $('#public-lobby-desc'),
+    !s.isPublic
+      ? 'off — only people with the code can join'
+      : s.opp
+        ? 'hidden from the list while the room is full'
+        : 'listed on the home page while you wait',
+  );
+
   const ev = $<HTMLInputElement>('#events-toggle');
   ev.checked = s.eventsEnabled;
   ev.disabled = s.role !== 'host' || s.starting;
@@ -66,7 +80,10 @@ export function renderLobby(s: LobbyViewState): void {
 
   let hint = '';
   if (s.relayWarning) hint = s.relayWarning;
-  else if (!s.opp && s.role === 'host') hint = 'Send the code or invite link to one friend. Keep this tab open.';
+  else if (!s.opp && s.role === 'host')
+    hint = s.isPublic
+      ? 'Anyone on the home page can see and join this room. Keep this tab open.'
+      : 'Send the code or invite link to one friend. Keep this tab open.';
   else if (s.opp && !s.myReady) hint = 'Press Ready when you are set.';
   else if (s.role === 'guest' && s.opp && s.myReady && s.opp.ready) hint = 'The host starts the match.';
   else if (s.role === 'guest') hint = 'Arena events are chosen by the host.';

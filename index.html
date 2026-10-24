@@ -25,6 +25,11 @@
             </label>
 
             <button id="btn-create" class="btn btn-primary btn-big" type="button">Create Room</button>
+            <label class="toggle small-toggle">
+              <input type="checkbox" id="public-toggle" />
+              <span class="toggle-ui"></span>
+              <span><strong>List my room publicly</strong> — anyone on this page can join</span>
+            </label>
 
             <div class="divider"><span>or join a friend</span></div>
 
@@ -36,9 +41,20 @@
             <p id="join-error" class="form-error" role="alert"></p>
 
             <p class="explainer">
-              A private <strong>1v1 duel</strong>. Create a room, send the code to one friend, and play directly
-              browser-to-browser — no accounts, no installs.
+              A <strong>1v1 duel</strong>, played directly browser-to-browser — no accounts, no installs.
+              List your room publicly for anyone to join, or keep it private and share the code with a friend.
             </p>
+          </div>
+
+          <div class="side-col">
+          <div class="card lobbies-card" aria-labelledby="lobbies-title">
+            <div class="lobbies-head">
+              <h2 id="lobbies-title">Open lobbies</h2>
+              <span id="lobbies-status" class="lobbies-status" data-state="connecting"><span class="dot"></span><span class="text">Searching…</span></span>
+              <button id="btn-refresh-lobbies" class="btn btn-ghost btn-sm" type="button" aria-label="Refresh open lobbies">↻</button>
+            </div>
+            <ul id="lobby-list" class="lobby-list" aria-live="polite"></ul>
+            <p id="lobbies-empty" class="lobbies-empty muted small">No open rooms right now. Create one — it shows up here for everyone.</p>
           </div>
 
           <div class="card howto-card">
@@ -55,6 +71,7 @@
               <span><kbd>Esc</kbd> menu</span>
             </div>
             <p id="local-stats" class="local-stats"></p>
+          </div>
           </div>
         </div>
       </section>
@@ -107,6 +124,12 @@
               <div class="slot-ready">—</div>
             </div>
           </div>
+
+          <label class="toggle" id="public-lobby-wrap">
+            <input type="checkbox" id="public-lobby-toggle" />
+            <span class="toggle-ui"></span>
+            <span><strong>Public room</strong> — <span id="public-lobby-desc">listed on the home page while you wait</span></span>
+          </label>
 
           <label class="toggle" id="events-toggle-wrap">
             <input type="checkbox" id="events-toggle" />

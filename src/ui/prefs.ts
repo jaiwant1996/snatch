@@ -7,6 +7,8 @@ export interface Prefs {
   muted: boolean;
   reducedMotion: boolean | null; // null = follow the OS setting
   arenaEvents: boolean;
+  /** Create rooms as public (listed on the home page). */
+  publicRooms: boolean;
 }
 
 export interface LocalStats {
@@ -44,6 +46,7 @@ export const prefs: Prefs = read<Prefs>(PREFS_KEY, {
   muted: false,
   reducedMotion: null,
   arenaEvents: true,
+  publicRooms: true,
 });
 
 export function savePrefs(): void {

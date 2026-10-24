@@ -392,6 +392,51 @@ try {
   await ctxM.close();
   await waitFor(A, () => !document.querySelector('#overlay-alert').hidden, null, 20000);
 
+  // ------------------------------------------------------------ public lobby directory
+  await A.click('#alert-actions .btn-primary'); // host back to the open lobby (public by default)
+  const rowSel = `#lobby-list .lobby-row[data-code="${code}"]`;
+  const ctxV = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const ctxW = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+  const V = await ctxV.newPage();
+  const W = await ctxW.newPage();
+  await V.goto(SITE + Q);
+  await W.goto(SITE + Q);
+  const vSees = await waitFor(V, (sel) => !!document.querySelector(sel), rowSel, 12000);
+  const wSees = await waitFor(W, (sel) => !!document.querySelector(sel), rowSel, 12000);
+  const rowText = vSees ? await V.textContent(rowSel) : '';
+  check('D1. a visitor opening the home page sees the open public room', vSees && wSees && rowText.includes('Alice'), rowText?.trim());
+  check('    directory status shows live', (await V.getAttribute('#lobbies-status', 'data-state')) === 'ok');
+  await sleep(600);
+  await V.screenshot({ path: path.join(SHOTS, '17-open-lobbies.png') });
+  await V.fill('#nickname', 'Vee');
+  await V.click(`${rowSel} .lobby-join`);
+  const vJoined = await waitFor(V, () => document.body.dataset.screen === 'lobby', null, 25000);
+  const aSeesV = await waitFor(A, () => document.querySelector('#slot-1 .slot-name')?.textContent === 'Vee', null, 10000);
+  check('D2. clicking Join in the list joins that room', vJoined && aSeesV);
+  const gone = await waitFor(W, (sel) => !document.querySelector(sel), rowSel, 8000);
+  check('D3. a full room disappears from everyone else\'s list', gone);
+  await V.click('#btn-leave-lobby');
+  const back = await waitFor(W, (sel) => !!document.querySelector(sel), rowSel, 15000);
+  check('D4. when the guest leaves, the room is listed again', back);
+  await A.click('#public-lobby-wrap .toggle-ui');
+  const hidden = await waitFor(W, (sel) => !document.querySelector(sel), rowSel, 8000);
+  check('D5. switching the room to private removes it from the list', hidden && !(await A.isChecked('#public-lobby-toggle')));
+  await A.click('#public-lobby-wrap .toggle-ui'); // back to public for the rest of the run
+  // A private room created from the home page is never listed.
+  const ctxP = await browser.newContext();
+  const P = await ctxP.newPage();
+  await P.goto(SITE + Q);
+  await P.fill('#nickname', 'Priv');
+  await P.click('.small-toggle .toggle-ui'); // untick "List my room publicly"
+  await P.click('#btn-create');
+  const pCode = (await P.textContent('#lobby-code'))?.trim();
+  await sleep(5000);
+  const pListed = await W.evaluate((c) => !!document.querySelector(`#lobby-list .lobby-row[data-code="${c}"]`), pCode);
+  check('D6. a room created as private never appears in the list', !pListed && (await W.$(rowSel)) !== null, pCode);
+  await ctxP.close();
+  await ctxV.close();
+  await ctxW.close();
+
   // ------------------------------------------------------------ unknown room
   if (!SKIP_TIMEOUT_TEST) {
     const ctxD = await browser.newContext();

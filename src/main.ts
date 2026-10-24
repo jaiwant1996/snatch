@@ -3,7 +3,7 @@
  */
 import Phaser from 'phaser';
 import './styles/main.css';
-import { WORLD } from './config/gameConfig';
+import { NET, WORLD } from './config/gameConfig';
 import { ArenaScene } from './game/ArenaScene';
 import { LocalInput } from './game/input';
 import { Session } from './lobby/lobbyManager';
@@ -14,6 +14,9 @@ import { $, copyText, ICONS, setText, toast } from './ui/dom';
 import { Hud } from './ui/hud';
 import { VoiceChat } from './network/voice';
 import { VoiceDock } from './ui/voiceDock';
+import { LobbyDirectory } from './network/directory';
+import { createDirectoryTransport } from './network/directoryTransport';
+import { LobbyListView } from './ui/lobbyList';
 import { prefs, reducedMotion, savePrefs, stats } from './ui/prefs';
 
 // ----------------------------------------------------------------- platform
@@ -89,7 +92,17 @@ const input = new LocalInput($('#touch-controls'));
 const hud = new Hud();
 const voice = new VoiceChat();
 const voiceDock = new VoiceDock(voice);
-const session = new Session(scene, input, hud, voice, voiceDock);
+// Public lobby list: announced/collected over the public Nostr relays (no server of ours).
+const directory = new LobbyDirectory(createDirectoryTransport(`${NET.appId}/lobbies/v1`));
+const session = new Session(scene, input, hud, voice, voiceDock, directory);
+
+/** Only listen for open rooms while the home page is actually on screen. */
+function syncDirectory(): void {
+  directory.setBrowsing(document.body.dataset.screen === 'menu' && !document.hidden);
+}
+new MutationObserver(syncDirectory).observe(document.body, { attributes: true, attributeFilter: ['data-screen'] });
+document.addEventListener('visibilitychange', syncDirectory);
+window.addEventListener('pagehide', () => directory.dispose());
 
 // ----------------------------------------------------------------- prefs / audio
 
@@ -154,10 +167,25 @@ function renderStats(): void {
 renderStats();
 document.addEventListener('snatch:menu', renderStats);
 
+const publicToggle = $<HTMLInputElement>('#public-toggle');
+publicToggle.checked = prefs.publicRooms;
+publicToggle.addEventListener('change', () => {
+  prefs.publicRooms = publicToggle.checked;
+  savePrefs();
+});
+
 $('#btn-create').addEventListener('click', () => {
   sound.unlock();
-  session.createRoom(currentName());
+  session.createRoom(currentName(), publicToggle.checked);
 });
+
+new LobbyListView(directory, (code) => {
+  sound.unlock();
+  joinCode.value = code;
+  setText(joinError, '');
+  session.joinRoom(code, currentName());
+});
+syncDirectory();
 
 joinCode.addEventListener('input', () => {
   const pos = joinCode.selectionStart;
@@ -198,6 +226,11 @@ $('#btn-cancel-join').addEventListener('click', () => session.cancelJoin());
 $('#btn-ready').addEventListener('click', () => session.toggleReady());
 $('#btn-start').addEventListener('click', () => session.hostStart());
 $('#btn-leave-lobby').addEventListener('click', () => session.leaveToMenu());
+$<HTMLInputElement>('#public-lobby-toggle').addEventListener('change', (e) => {
+  const on = (e.target as HTMLInputElement).checked;
+  publicToggle.checked = on;
+  session.setPublic(on);
+});
 $<HTMLInputElement>('#events-toggle').addEventListener('change', (e) =>
   session.setEventsEnabled((e.target as HTMLInputElement).checked),
 );
@@ -228,4 +261,4 @@ $('#btn-res-lobby').addEventListener('click', () => session.resultsToLobby());
 $('#btn-res-menu').addEventListener('click', () => session.leaveToMenu());
 
 // Exposed for the automated two-browser test only (harmless in production).
-(window as unknown as { __snatch?: unknown }).__snatch = { session, scene, voice };
+(window as unknown as { __snatch?: unknown }).__snatch = { session, scene, voice, directory };

@@ -188,6 +188,35 @@ kbd {
 .local-stats { margin: 18px 0 0; font-size: 0.82rem; color: var(--muted); }
 @media (hover: none) and (pointer: coarse) { .keys { display: none; } }
 
+/* ----------------------------------------------------------- open lobbies */
+.side-col { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.lobbies-card { padding: 22px; display: flex; flex-direction: column; gap: 12px; }
+.lobbies-head { display: flex; align-items: center; gap: 10px; }
+.lobbies-head h2 { margin: 0; font-size: 1.05rem; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); flex: 1; }
+.lobbies-head .btn-sm { padding: 4px 10px; font-size: 1.05rem; }
+.lobbies-status {
+  display: inline-flex; align-items: center; gap: 6px; font-size: 0.74rem; font-weight: 800;
+  color: var(--muted); letter-spacing: 0.04em; cursor: default;
+}
+.lobbies-status .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--token); animation: pulse 1.2s ease-in-out infinite; }
+.lobbies-status[data-state='ok'] .dot { background: var(--go); animation: none; box-shadow: 0 0 8px var(--go); }
+.lobbies-status[data-state='unreachable'] { color: var(--danger); }
+.lobbies-status[data-state='unreachable'] .dot { background: var(--danger); animation: none; }
+.lobby-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; max-height: 264px; overflow-y: auto; }
+.lobby-row {
+  display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px;
+  padding: 10px 10px 10px 12px; border-radius: 12px; background: var(--bg); border: 1px solid var(--border);
+  animation: fade 0.3s ease both;
+}
+.lobby-row:hover { border-color: rgba(46, 230, 240, 0.4); }
+.lobby-badge { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; background: var(--surface-2); }
+.lobby-info { display: flex; flex-direction: column; min-width: 0; }
+.lobby-name { font-weight: 900; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lobby-meta { font-size: 0.78rem; color: var(--muted); font-weight: 700; line-height: 1.35; }
+.lobby-join { padding: 8px 16px; box-shadow: none; }
+.lobbies-empty { margin: 0; line-height: 1.5; }
+.small-toggle { font-size: 0.85rem; margin-top: -2px; }
+
 /* ---------------------------------------------------------------- buttons */
 .btn {
   appearance: none;
